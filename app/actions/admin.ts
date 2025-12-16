@@ -1,5 +1,7 @@
 'use server';
 
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getUsers, saveUsers, generateUserId, generateCertificateId } from '@/lib/data';
 import { User, Certificate } from '@/lib/types';
@@ -18,16 +20,17 @@ export async function createUserAction(formData: FormData) {
 
   const users = getUsers();
   
-  // Check if email already exists
   if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
     return { error: 'Email sudah terdaftar' };
   }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const newUser: User = {
     id: generateUserId(),
     name,
     email,
-    password, // In production, hash this password
+    password: hashedPassword,
     role: 'user',
     status,
     certificates: [],
@@ -62,7 +65,6 @@ export async function updateUserAction(formData: FormData) {
     return { error: 'User tidak ditemukan' };
   }
 
-  // Check if email already used by another user
   const emailExists = users.some(
     u => u.email.toLowerCase() === email.toLowerCase() && u.id !== id
   );
@@ -71,12 +73,14 @@ export async function updateUserAction(formData: FormData) {
     return { error: 'Email sudah digunakan user lain' };
   }
 
+  const nextPassword = password ? await bcrypt.hash(password, 10) : null;
+
   users[userIndex] = {
     ...users[userIndex],
     name,
     email,
     status,
-    ...(password && { password }), // Only update password if provided
+    ...(nextPassword && { password: nextPassword }),
   };
 
   const saved = saveUsers(users);
@@ -97,10 +101,26 @@ export async function deleteUserAction(formData: FormData) {
   }
 
   const users = getUsers();
+  const userToDelete = users.find(u => u.id === id);
   const filteredUsers = users.filter(u => u.id !== id);
 
   if (filteredUsers.length === users.length) {
     return { error: 'User tidak ditemukan' };
+  }
+
+  const certificateFiles = (userToDelete?.certificates || [])
+    .map(c => c.file)
+    .filter((fileName): fileName is string => typeof fileName === 'string' && fileName.length > 0);
+
+  for (const fileName of certificateFiles) {
+    try {
+      const filePath = path.join(process.cwd(), 'public', 'certificates', fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      console.error('Error deleting certificate file:', error);
+    }
   }
 
   const saved = saveUsers(filteredUsers);
@@ -116,13 +136,15 @@ export async function deleteUserAction(formData: FormData) {
 export async function uploadCertificateAction(formData: FormData) {
   const userId = formData.get('userId') as string;
   const title = formData.get('title') as string;
-  const file = formData.get('file') as File;
+  const files = formData
+    .getAll('file')
+    .filter((f): f is File => typeof (f as any)?.arrayBuffer === 'function' && typeof (f as any)?.name === 'string');
 
-  if (!userId || !title || !file) {
+  if (!userId || !title || files.length === 0) {
     return { error: 'Semua field harus diisi' };
   }
 
-  if (!file.name.endsWith('.pdf')) {
+  if (files.some((f) => !f.name.toLowerCase().endsWith('.pdf'))) {
     return { error: 'File harus berformat PDF' };
   }
 
@@ -133,52 +155,69 @@ export async function uploadCertificateAction(formData: FormData) {
     return { error: 'User tidak ditemukan' };
   }
 
-  // Generate unique filename
   const timestamp = Date.now();
   const sanitizedName = users[userIndex].name.toLowerCase().replace(/\s+/g, '-');
-  const fileName = `${sanitizedName}-${timestamp}.pdf`;
-  
-  // Save file to public/certificates
+
   const certificatesDir = path.join(process.cwd(), 'public', 'certificates');
   
-  // Ensure directory exists
   if (!fs.existsSync(certificatesDir)) {
     fs.mkdirSync(certificatesDir, { recursive: true });
   }
 
-  const filePath = path.join(certificatesDir, fileName);
-  
+  const issuedAt = new Date().toISOString().split('T')[0];
+  const newCertificates: Certificate[] = [];
+  const writtenFiles: string[] = [];
+
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = `${sanitizedName}-${timestamp}-${randomUUID()}.pdf`;
+      const filePath = path.join(certificatesDir, fileName);
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      fs.writeFileSync(filePath, buffer);
+      writtenFiles.push(fileName);
+
+      const certTitle = files.length > 1 ? `${title} (${i + 1})` : title;
+      newCertificates.push({
+        id: generateCertificateId(),
+        title: certTitle,
+        file: fileName,
+        issuedAt,
+      });
+    }
   } catch (error) {
+    for (const fileName of writtenFiles) {
+      try {
+        const filePath = path.join(certificatesDir, fileName);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch {}
+    }
     console.error('Error saving file:', error);
     return { error: 'Gagal menyimpan file' };
   }
 
-  // Add certificate to user
-  const newCertificate: Certificate = {
-    id: generateCertificateId(),
-    title,
-    file: fileName,
-    issuedAt: new Date().toISOString().split('T')[0],
-  };
-
   if (!users[userIndex].certificates) {
     users[userIndex].certificates = [];
   }
-  
-  users[userIndex].certificates.push(newCertificate);
+
+  users[userIndex].certificates.push(...newCertificates);
 
   const saved = saveUsers(users);
 
   if (!saved) {
+    for (const fileName of writtenFiles) {
+      try {
+        const filePath = path.join(certificatesDir, fileName);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch {}
+    }
     return { error: 'Gagal menyimpan data sertifikat' };
   }
 
   revalidatePath('/admin/users');
   revalidatePath('/admin/upload-certificate');
-  return { success: true, message: 'Sertifikat berhasil diupload' };
+  return { success: true, message: `Sertifikat berhasil diupload (${newCertificates.length} file)` };
 }
 
 export async function deleteCertificateAction(formData: FormData) {
@@ -202,13 +241,10 @@ export async function deleteCertificateAction(formData: FormData) {
     return { error: 'Sertifikat tidak ditemukan' };
   }
 
-  // Get filename before removing
   const fileName = users[userIndex].certificates[certIndex].file;
 
-  // Remove certificate from array
   users[userIndex].certificates.splice(certIndex, 1);
 
-  // Try to delete the file
   try {
     const filePath = path.join(process.cwd(), 'public', 'certificates', fileName);
     if (fs.existsSync(filePath)) {
@@ -216,7 +252,6 @@ export async function deleteCertificateAction(formData: FormData) {
     }
   } catch (error) {
     console.error('Error deleting file:', error);
-    // Continue anyway, file deletion is not critical
   }
 
   const saved = saveUsers(users);

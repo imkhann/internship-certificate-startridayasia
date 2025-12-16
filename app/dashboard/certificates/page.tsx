@@ -1,5 +1,8 @@
 import { getSession } from '@/lib/auth';
 import { getUserById } from '@/lib/data';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 
 export default async function CertificatesPage() {
   const session = await getSession();
@@ -13,70 +16,47 @@ export default async function CertificatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Sertifikat Saya</h1>
-          <p className="text-gray-500">Download sertifikat magang Anda</p>
+          <h1 className="text-2xl font-bold text-dark-900">My Certificates</h1>
+          <p className="text-dark-500">Download your internship certificates</p>
         </div>
-        <div className="bg-primary-100 text-primary-700 px-4 py-2 rounded-lg font-medium">
-          Total: {certificates.length} sertifikat
-        </div>
+        <Badge variant="primary" className="text-sm px-3 py-1">
+          Total: {certificates.length}
+        </Badge>
       </div>
 
-      {/* Certificates Grid */}
       {certificates.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {certificates.map((cert) => (
-            <div key={cert.id} className="card hover:shadow-xl transition-shadow">
-              <div className="text-center mb-4">
-                <div className="inline-block p-4 bg-primary-100 rounded-full mb-3">
-                  <span className="text-4xl">📜</span>
+            <Card key={cert.id} className="hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-primary-50 rounded-lg text-primary-600">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
                 </div>
-                <h3 className="font-bold text-gray-800 text-lg">{cert.title}</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Diterbitkan: {cert.issuedAt}
-                </p>
+                <Badge variant="neutral">{cert.issuedAt}</Badge>
               </div>
-
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs text-gray-400 mb-3">File: {cert.file}</p>
-                <a
-                  href={`/certificates/${cert.file}`}
-                  download
-                  className="btn-primary w-full text-center block"
-                >
-                  ⬇️ Download PDF
-                </a>
-              </div>
-            </div>
+              <h3 className="font-bold text-dark-900 mb-1 line-clamp-1">{cert.title}</h3>
+              <p className="text-sm text-dark-500 mb-4">PDF Document</p>
+              <a href={`/certificates/${cert.file}`} download className="block">
+                <Button variant="primary" className="w-full">Download PDF</Button>
+              </a>
+            </Card>
           ))}
         </div>
       ) : (
-        <div className="card text-center py-12">
-          <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">
-            Belum Ada Sertifikat
-          </h3>
-          <p className="text-gray-500">
-            Anda belum memiliki sertifikat. Hubungi admin jika Anda sudah menyelesaikan program magang.
-          </p>
-        </div>
-      )}
-
-      {/* Info Card */}
-      <div className="card bg-blue-50 border border-blue-200">
-        <div className="flex items-start space-x-3">
-          <span className="text-2xl">ℹ️</span>
-          <div>
-            <h4 className="font-bold text-blue-800">Informasi</h4>
-            <p className="text-blue-700 text-sm">
-              Sertifikat dalam format PDF. Pastikan Anda memiliki PDF reader untuk membuka file.
-              Jika ada masalah dengan download, silakan hubungi admin.
-            </p>
+        <Card className="text-center py-12 border-dashed border-2 border-dark-200 shadow-none">
+          <div className="mx-auto w-16 h-16 bg-dark-50 rounded-full flex items-center justify-center mb-4 text-dark-400">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
           </div>
-        </div>
-      </div>
+          <h3 className="text-lg font-medium text-dark-900 mb-1">No certificates yet</h3>
+          <p className="text-dark-500">Your certificates will appear here once approved by the StartFriday team.</p>
+        </Card>
+      )}
     </div>
   );
 }

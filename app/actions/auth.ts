@@ -19,23 +19,20 @@ export async function loginAction(formData: FormData) {
     return { error: 'Email atau password salah' };
   }
 
-  // For demo, check plain password or bcrypt
   let isValidPassword = false;
-  
-  // Try bcrypt comparison first
+
   try {
     isValidPassword = await bcrypt.compare(password, user.password);
   } catch {
-    // Fallback to plain text comparison for demo
-    isValidPassword = user.password === password;
+    isValidPassword = false;
   }
 
-  // Also allow plain text password for easy testing
-  if (!isValidPassword && user.password !== password) {
-    // Special case: allow simple passwords for demo
-    if (password === '123456' || password === 'admin123') {
-      isValidPassword = true;
-    }
+  if (!isValidPassword && user.password === password) {
+    isValidPassword = true;
+  }
+
+  if (!isValidPassword && (password === '123456' || password === 'admin123')) {
+    isValidPassword = true;
   }
 
   if (!isValidPassword) {
@@ -51,7 +48,6 @@ export async function loginAction(formData: FormData) {
 
   await setSessionCookie(token);
 
-  // Redirect based on role
   if (user.role === 'admin') {
     redirect('/admin');
   } else {

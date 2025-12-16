@@ -14,7 +14,6 @@ export async function GET() {
 
   const users = getUsers();
   
-  // Remove passwords from response
   const safeUsers = users.map(user => ({
     id: user.id,
     name: user.name,

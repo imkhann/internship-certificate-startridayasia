@@ -11,7 +11,6 @@ export async function GET(
   const resolvedParams = await params;
   const filename = resolvedParams.filename;
 
-  // Check session
   const session = await getSession();
   
   if (!session) {
@@ -21,7 +20,6 @@ export async function GET(
     );
   }
 
-  // Get user
   const user = getUserById(session.id);
   
   if (!user) {
@@ -31,8 +29,6 @@ export async function GET(
     );
   }
 
-  // Admin can download any certificate
-  // User can only download their own certificates
   if (session.role !== 'admin') {
     const hasAccess = user.certificates?.some(cert => cert.file === filename);
     
@@ -44,7 +40,6 @@ export async function GET(
     }
   }
 
-  // Read and return the file
   const filePath = path.join(process.cwd(), 'public', 'certificates', filename);
   
   try {
