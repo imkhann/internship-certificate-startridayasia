@@ -26,7 +26,7 @@ export default function HomePage() {
           <Link href="/login">
             <Button 
               size="lg" 
-              className="bg-white text-primary-700 hover:bg-gray-50 border-transparent text-lg px-8 py-6 h-auto shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200"
+              className="bg-white text-primary-700 hover:bg-white/95 border-transparent text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-shadow"
             >
               Masuk ke Portal
             </Button>

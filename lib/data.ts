@@ -1,16 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import { User } from './types';
+import usersSeed from '@/data/users.json';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'users.json');
+const SEED_USERS = usersSeed as unknown as User[];
 
 export function getUsers(): User[] {
   try {
     const data = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? (parsed as User[]) : SEED_USERS;
   } catch (error) {
     console.error('Error reading users:', error);
-    return [];
+    return SEED_USERS;
   }
 }
 
